@@ -4,7 +4,7 @@
 *.swp
 *.swo
 
-# Бинарные файлы
+# Binary files
 *.exe
 *.exe~
 *.dll
@@ -12,19 +12,19 @@
 *.dylib
 dumper
 
-# Тестовые файлы
+# Test files
 *.test
 *.out
 
-# Дампы баз данных
+# Database dumps
 dumps/*.sql
 
-# Конфигурационные файлы с реальными данными
+# Configuration files with real data
 config.yaml
 
-# Системные файлы
+# System files
 .DS_Store
 Thumbs.db
 
-# Go специфичные
+# Go specific
 vendor/ 

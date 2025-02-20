@@ -32,7 +32,7 @@ func NewGlobalKeybindings(
 
 // Setup sets up all global key bindings
 func (k *GlobalKeybindings) Setup() error {
-	// Quit - доступен во всех view
+	// Quit - available in all views
 	views := []string{"", "migrations", "environments", "connection", "status", "commands"}
 	for _, view := range views {
 		if err := k.gui.SetKeybinding(view, gocui.KeyCtrlC, gocui.ModNone, k.quit); err != nil {
@@ -43,7 +43,7 @@ func (k *GlobalKeybindings) Setup() error {
 		}
 	}
 
-	// Глобальные команды - только для пустого view
+	// Global commands - only for empty view
 	if err := k.gui.SetKeybinding("", 'd', gocui.ModNone, k.dump); err != nil {
 		return err
 	}
@@ -60,21 +60,21 @@ func (k *GlobalKeybindings) Setup() error {
 }
 
 func (k *GlobalKeybindings) quit(g *gocui.Gui, v *gocui.View) error {
-	// Принудительно обрабатываем выход
+	// Handle quit
 	return k.onQuit()
 }
 
 func (k *GlobalKeybindings) dump(g *gocui.Gui, v *gocui.View) error {
-	// Принудительно обрабатываем дамп
+	// Handle dump
 	return k.onDump()
 }
 
 func (k *GlobalKeybindings) load(g *gocui.Gui, v *gocui.View) error {
-	// Принудительно обрабатываем загрузку
+	// Handle load
 	return k.onLoad()
 }
 
 func (k *GlobalKeybindings) showEnvironments(g *gocui.Gui, v *gocui.View) error {
-	// Принудительно обрабатываем показ окружений
+	// Handle show environments
 	return k.onSpace()
 }

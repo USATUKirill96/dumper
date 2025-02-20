@@ -15,19 +15,19 @@ import (
 )
 
 const (
-	// Имя контейнера
+	// Container name
 	containerName = "local_postgres"
 
-	// Образ PostgreSQL
+	// PostgreSQL image
 	postgresImage = "postgres:16"
 
-	// Пароль для пользователя postgres в контейнере
+	// Password for postgres user in container
 	postgresPassword = "pass"
 
-	// Сколько ждём, пока контейнер поднимет PostgreSQL
+	// How long to wait for PostgreSQL to start in container
 	maxWaitSeconds = 30
 
-	// Директория для дампов
+	// Directory for dumps
 	dumpsDir = "dumps"
 )
 
@@ -40,18 +40,18 @@ type application struct {
 }
 
 func main() {
-	// Парсим флаги
-	debug := flag.Bool("debug", false, "Включить отладочный вывод")
+	// Parse flags
+	debug := flag.Bool("debug", false, "Enable debug output")
 	flag.Parse()
 
-	// Загружаем конфигурацию
+	// Load configuration
 	cfg, err := app.LoadConfig("config.yaml", dumpsDir)
 	if err != nil {
-		fmt.Printf("Ошибка загрузки конфига: %v\n", err)
+		fmt.Printf("Error loading config: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Создаем конфигурацию PostgreSQL
+	// Create PostgreSQL configuration
 	pgConfig := database.PostgresConfig{
 		ContainerName:  containerName,
 		Image:          postgresImage,
@@ -60,13 +60,13 @@ func main() {
 		Debug:          *debug,
 	}
 
-	// Создаем локальное подключение с временной базой
+	// Create local connection with temporary database
 	localDb := &db.Connection{
 		Host:     "localhost",
 		Port:     "5432",
 		User:     "postgres",
 		Password: postgresPassword,
-		Database: "postgres", // Будет изменено при выборе окружения
+		Database: "postgres", // Will be changed when environment is selected
 		SslMode:  "disable",
 	}
 
@@ -77,23 +77,23 @@ func main() {
 		debug:    *debug,
 	}
 
-	// Создаем UI
+	// Create UI
 	ui, err := ui.New(cfg, localDb,
-		// Функция для создания дампа
+		// Function to create dump
 		app.dump,
-		// Функция для загрузки дампа
+		// Function to load dump
 		app.load,
 	)
 	if err != nil {
-		fmt.Printf("Ошибка создания UI: %v\n", err)
+		fmt.Printf("Error creating UI: %v\n", err)
 		os.Exit(1)
 	}
 
 	app.ui = ui
 
-	// Запускаем UI
+	// Run UI
 	if err := ui.Run(); err != nil && err != gocui.ErrQuit {
-		fmt.Printf("Ошибка в UI: %v\n", err)
+		fmt.Printf("UI error: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -106,7 +106,7 @@ func (a *application) dump() error {
 
 	dumpFile := filepath.Join(dumpsDir, fmt.Sprintf("%s.sql", a.localDb.Database))
 
-	// Выполняем операцию дампа
+	// Execute dump operation
 	if err := database.DumpDatabase(currentEnv.DbDsn, dumpFile, a.debug); err != nil {
 		return fmt.Errorf("failed to create dump: %w", err)
 	}

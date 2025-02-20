@@ -16,14 +16,14 @@ type PostgresConfig struct {
 	Debug          bool
 }
 
-// debugPrintf выводит отладочную информацию только если включен режим debug
+// debugPrintf prints debug information only if debug mode is enabled
 func debugPrintf(debug bool, format string, a ...interface{}) {
 	if debug {
 		fmt.Printf(format, a...)
 	}
 }
 
-// debugCmd выполняет команду с выводом в stdout/stderr только в режиме debug
+// debugCmd executes command with stdout/stderr output only in debug mode
 func debugCmd(cmd *exec.Cmd, debug bool) error {
 	if debug {
 		cmd.Stdout = os.Stdout
@@ -69,55 +69,55 @@ func DumpDatabase(dsn string, dumpFile string, debug bool) error {
 	return nil
 }
 
-// LoadDump загружает дамп в локальную базу данных
+// LoadDump loads dump into local database
 func LoadDump(cfg PostgresConfig, dbName string, dumpFile string) error {
-	// Проверяем, запущен ли контейнер
+	// Check if container is running
 	checkCmd := exec.Command("docker", "ps", "-q", "-f", "name="+cfg.ContainerName)
 	output, err := checkCmd.Output()
 	if err != nil || len(output) == 0 {
-		// Контейнер не запущен, стартуем его
-		debugPrintf(cfg.Debug, "Контейнер не запущен, запускаю...\n")
+		// Container is not running, start it
+		debugPrintf(cfg.Debug, "Container is not running, starting...\n")
 		if err := startContainer(cfg, dbName); err != nil {
-			return fmt.Errorf("не удалось запустить контейнер: %w", err)
+			return fmt.Errorf("failed to start container: %w", err)
 		}
 
-		// Ждём, пока PostgreSQL в контейнере поднимется
+		// Wait for PostgreSQL to start in container
 		if err := waitForPostgres(cfg); err != nil {
-			return fmt.Errorf("PostgreSQL не поднялся: %w", err)
+			return fmt.Errorf("PostgreSQL failed to start: %w", err)
 		}
 	}
 
-	// Проверяем существование файла дампа
+	// Check if dump file exists
 	if _, err := os.Stat(dumpFile); os.IsNotExist(err) {
-		return fmt.Errorf("файл дампа не найден: %s", dumpFile)
+		return fmt.Errorf("dump file not found: %s", dumpFile)
 	}
 
-	debugPrintf(cfg.Debug, "Загружаю дамп в базу %s...\n", dbName)
+	debugPrintf(cfg.Debug, "Loading dump into database %s...\n", dbName)
 
-	// Выводим размер дампа только в режиме debug
+	// Show dump size only in debug mode
 	if cfg.Debug {
 		statCmd := exec.Command("ls", "-l", dumpFile)
 		statCmd.Stdout = os.Stdout
 		debugCmd(statCmd, cfg.Debug)
 	}
 
-	// Удаляем только текущую базу данных, если она существует
+	// Drop current database if it exists
 	dropCmd := exec.Command("bash", "-c",
 		fmt.Sprintf("docker exec %s dropdb -U postgres --if-exists %s",
 			cfg.ContainerName, dbName))
 	if err := debugCmd(dropCmd, cfg.Debug); err != nil {
-		debugPrintf(cfg.Debug, "Предупреждение: не удалось удалить старую базу: %v\n", err)
+		debugPrintf(cfg.Debug, "Warning: failed to drop old database: %v\n", err)
 	}
 
-	// Создаем новую базу
+	// Create new database
 	createCmd := exec.Command("bash", "-c",
 		fmt.Sprintf("docker exec %s createdb -U postgres %s",
 			cfg.ContainerName, dbName))
 	if err := debugCmd(createCmd, cfg.Debug); err != nil {
-		return fmt.Errorf("ошибка создания базы данных: %w", err)
+		return fmt.Errorf("error creating database: %w", err)
 	}
 
-	// Восстанавливаем данные
+	// Restore data
 	restoreCmd := exec.Command("bash", "-c",
 		fmt.Sprintf("docker exec -i %s psql -U postgres -d %s < %s",
 			cfg.ContainerName, dbName, dumpFile))
@@ -127,30 +127,30 @@ func LoadDump(cfg PostgresConfig, dbName string, dumpFile string) error {
 	}
 
 	if err := restoreCmd.Run(); err != nil {
-		return fmt.Errorf("ошибка при восстановлении SQL: %w", err)
+		return fmt.Errorf("error restoring SQL: %w", err)
 	}
 
-	// Проверяем количество таблиц
+	// Check number of tables
 	statsCmd := exec.Command("bash", "-c",
 		fmt.Sprintf("docker exec %s psql -U postgres -d %s -t -c \""+
 			"SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public';\"",
 			cfg.ContainerName, dbName))
 	output, err = statsCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("ошибка при подсчете таблиц: %w\nВывод: %s", err, string(output))
+		return fmt.Errorf("error counting tables: %w\nOutput: %s", err, string(output))
 	}
 
 	count := strings.TrimSpace(string(output))
-	debugPrintf(cfg.Debug, "\nКоличество таблиц в базе данных: %s\n", count)
+	debugPrintf(cfg.Debug, "\nNumber of tables in database: %s\n", count)
 
 	if count == "0" {
-		return fmt.Errorf("после восстановления в базе нет таблиц")
+		return fmt.Errorf("no tables in database after restore")
 	}
 
 	return nil
 }
 
-// startContainer поднимает новый контейнер PostgreSQL
+// startContainer starts a new PostgreSQL container
 func startContainer(cfg PostgresConfig, dbName string) error {
 	cmd := exec.Command("docker", "run", "-d",
 		"--name", cfg.ContainerName,
@@ -162,20 +162,20 @@ func startContainer(cfg PostgresConfig, dbName string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	debugPrintf(cfg.Debug, "Запускаю контейнер %s...\n", cfg.ContainerName)
+	debugPrintf(cfg.Debug, "Starting container %s...\n", cfg.ContainerName)
 	return cmd.Run()
 }
 
-// waitForPostgres ждёт, пока PostgreSQL внутри контейнера станет доступен
+// waitForPostgres waits until PostgreSQL in container becomes available
 func waitForPostgres(cfg PostgresConfig) error {
-	debugPrintf(cfg.Debug, "Ожидаю, пока PostgreSQL примет соединения (pg_isready)...\n")
+	debugPrintf(cfg.Debug, "Waiting for PostgreSQL to accept connections (pg_isready)...\n")
 	for i := 0; i < cfg.MaxWaitSeconds; i++ {
 		checkCmd := exec.Command("docker", "exec", cfg.ContainerName, "pg_isready", "-U", "postgres")
 		if err := checkCmd.Run(); err == nil {
-			debugPrintf(cfg.Debug, "PostgreSQL готов!\n")
+			debugPrintf(cfg.Debug, "PostgreSQL is ready!\n")
 			return nil
 		}
 		time.Sleep(time.Second)
 	}
-	return fmt.Errorf("превышено %d секунд ожидания", cfg.MaxWaitSeconds)
+	return fmt.Errorf("timeout after %d seconds", cfg.MaxWaitSeconds)
 }

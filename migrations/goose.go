@@ -6,19 +6,19 @@ import (
 	"path/filepath"
 	"sort"
 
-	_ "github.com/lib/pq" // драйвер PostgreSQL
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/pressly/goose/v3"
 )
 
 type MigrationStatus struct {
 	ID        int64
-	Name      string // полное имя файла с путём
-	ShortName string // только имя файла без пути
+	Name      string // full file name with path
+	ShortName string // file name without path
 	Applied   bool
 	Timestamp int64
 }
 
-// Logger для перехвата вывода goose
+// Logger for intercepting goose output
 type Logger struct {
 	onLog func(string, ...interface{})
 }

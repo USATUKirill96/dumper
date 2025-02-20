@@ -21,7 +21,7 @@ func NewMainLayout(gui *gocui.Gui) *MainLayout {
 	return &MainLayout{
 		gui:        gui,
 		components: make([]views.Component, 0),
-		commands:   " Пробел - Выбрать окружение | d - Создать дамп | l - Загрузить дамп | q/Ctrl+C - Выход",
+		commands:   " Space - Select Environment | d - Create Dump | l - Load Dump | q/Ctrl+C - Exit",
 	}
 }
 

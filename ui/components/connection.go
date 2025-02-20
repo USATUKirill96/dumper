@@ -72,7 +72,6 @@ func (c *ConnectionView) updateConnectionInfo(v *gocui.View) {
 	fmt.Fprintf(v, "   Database: %s\n", c.localDb.Database)
 	fmt.Fprintf(v, "   User:     %s\n", c.localDb.User)
 	fmt.Fprintf(v, "   Password: %s\n", c.localDb.Password)
-	fmt.Fprintf(v, "   DSN:      %s\n", c.localDb.GetDSN())
 
 	fmt.Fprintln(v, "\n Remote database:")
 	remote, err := db.ParseDSN(c.currentEnv.DbDsn)
