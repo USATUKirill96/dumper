@@ -10,8 +10,9 @@ import (
 )
 
 type Environment struct {
-	Name  string `yaml:"name"`
-	DbDsn string `yaml:"db_dsn"`
+	Name          string `yaml:"name"`
+	DbDsn         string `yaml:"db_dsn"`
+	MigrationsDir string `yaml:"migrations_dir"`
 }
 
 type DbConnection struct {

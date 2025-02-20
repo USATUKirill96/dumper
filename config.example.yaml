@@ -1,9 +1,12 @@
 environments:
   - name: dev
     db_dsn: postgres://user:password@dev-host:5432/database?sslmode=disable
+    migrations_dir: ./migrations/dev
   
   - name: stage
     db_dsn: postgres://user:password@stage-host:5432/database?sslmode=verify-full
+    migrations_dir: ./migrations/stage
   
   - name: prod
-    db_dsn: postgres://user:password@prod-host:5432/database?sslmode=verify-full 
+    db_dsn: postgres://user:password@prod-host:5432/database?sslmode=verify-full
+    migrations_dir: ./migrations/prod 
