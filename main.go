@@ -6,7 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"dumper/config"
+	"dumper/config/app"
+	"dumper/config/db"
 	"dumper/database"
 	"dumper/ui"
 
@@ -30,10 +31,10 @@ const (
 	dumpsDir = "dumps"
 )
 
-type app struct {
+type application struct {
 	ui       *ui.UI
-	cfg      *config.Config
-	localDb  *config.DbConnection
+	cfg      *app.Config
+	localDb  *db.Connection
 	pgConfig database.PostgresConfig
 	debug    bool
 }
@@ -44,7 +45,7 @@ func main() {
 	flag.Parse()
 
 	// Загружаем конфигурацию
-	cfg, err := config.LoadConfig("config.yaml", dumpsDir)
+	cfg, err := app.LoadConfig("config.yaml", dumpsDir)
 	if err != nil {
 		fmt.Printf("Ошибка загрузки конфига: %v\n", err)
 		os.Exit(1)
@@ -60,7 +61,7 @@ func main() {
 	}
 
 	// Создаем локальное подключение с временной базой
-	localDb := &config.DbConnection{
+	localDb := &db.Connection{
 		Host:     "localhost",
 		Port:     "5432",
 		User:     "postgres",
@@ -69,7 +70,7 @@ func main() {
 		SslMode:  "disable",
 	}
 
-	app := &app{
+	app := &application{
 		cfg:      cfg,
 		localDb:  localDb,
 		pgConfig: pgConfig,
@@ -97,16 +98,23 @@ func main() {
 	}
 }
 
-func (a *app) dump() error {
-	dumpFile := filepath.Join(dumpsDir, fmt.Sprintf("%s.sql", a.localDb.Database))
+func (a *application) dump() error {
 	currentEnv := a.ui.GetCurrentEnvironment()
 	if currentEnv == nil {
-		return fmt.Errorf("не выбрано окружение")
+		return fmt.Errorf("environment not selected")
 	}
-	return database.DumpDatabase(currentEnv.DbDsn, dumpFile, a.debug)
+
+	dumpFile := filepath.Join(dumpsDir, fmt.Sprintf("%s.sql", a.localDb.Database))
+
+	// Выполняем операцию дампа
+	if err := database.DumpDatabase(currentEnv.DbDsn, dumpFile, a.debug); err != nil {
+		return fmt.Errorf("failed to create dump: %w", err)
+	}
+
+	return nil
 }
 
-func (a *app) load() error {
+func (a *application) load() error {
 	dumpFile := filepath.Join(dumpsDir, fmt.Sprintf("%s.sql", a.localDb.Database))
 	return database.LoadDump(a.pgConfig, a.localDb.Database, dumpFile)
 }

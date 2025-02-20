@@ -35,38 +35,38 @@ func (l *Logger) Printf(format string, v ...interface{}) {
 	}
 }
 
-// GetMigrationStatus возвращает статус всех миграций
+// GetMigrationStatus returns status of all migrations
 func GetMigrationStatus(dbDsn string, migrationsDir string, onLog func(string, ...interface{})) ([]MigrationStatus, error) {
 	if migrationsDir == "" {
 		return nil, nil
 	}
 
-	// Настраиваем логгер
+	// Set up logger
 	goose.SetLogger(&Logger{onLog: onLog})
 
-	// Проверяем существование директории
+	// Check directory exists
 	absPath, err := filepath.Abs(migrationsDir)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения абсолютного пути: %w", err)
+		return nil, fmt.Errorf("error getting absolute path: %w", err)
 	}
 
-	// Подключаемся к базе
+	// Connect to database
 	db, err := sql.Open("postgres", dbDsn)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка подключения к базе: %w", err)
+		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
 	defer db.Close()
 
-	// Получаем список всех миграций
+	// Get all migrations
 	migrations, err := goose.CollectMigrations(absPath, 0, goose.MaxVersion)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка чтения миграций: %w", err)
+		return nil, fmt.Errorf("error reading migrations: %w", err)
 	}
 
-	// Получаем примененные миграции
+	// Get applied migrations
 	current, err := goose.GetDBVersion(db)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения версии БД: %w", err)
+		return nil, fmt.Errorf("error getting DB version: %w", err)
 	}
 
 	var result []MigrationStatus
@@ -80,7 +80,7 @@ func GetMigrationStatus(dbDsn string, migrationsDir string, onLog func(string, .
 		})
 	}
 
-	// Сортируем по timestamp
+	// Sort by timestamp
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Timestamp < result[j].Timestamp
 	})
@@ -88,40 +88,40 @@ func GetMigrationStatus(dbDsn string, migrationsDir string, onLog func(string, .
 	return result, nil
 }
 
-// MigrateTo выполняет миграцию базы данных до указанной версии
+// MigrateTo migrates database to specified version
 func MigrateTo(dbDsn string, migrationsDir string, targetVersion int64, onLog func(string, ...interface{})) error {
-	// Настраиваем логгер
+	// Set up logger
 	goose.SetLogger(&Logger{onLog: onLog})
 
-	// Проверяем существование директории
+	// Check directory exists
 	absPath, err := filepath.Abs(migrationsDir)
 	if err != nil {
-		return fmt.Errorf("ошибка получения абсолютного пути: %w", err)
+		return fmt.Errorf("error getting absolute path: %w", err)
 	}
 
-	// Подключаемся к базе
+	// Connect to database
 	db, err := sql.Open("postgres", dbDsn)
 	if err != nil {
-		return fmt.Errorf("ошибка подключения к базе: %w", err)
+		return fmt.Errorf("error connecting to database: %w", err)
 	}
 	defer db.Close()
 
-	// Получаем текущую версию
+	// Get current version
 	currentVersion, err := goose.GetDBVersion(db)
 	if err != nil {
-		return fmt.Errorf("ошибка получения текущей версии: %w", err)
+		return fmt.Errorf("error getting current version: %w", err)
 	}
 
-	// Выбираем направление миграции
+	// Choose migration direction
 	if targetVersion > currentVersion {
-		// Миграция вперед
+		// Migrate up
 		if err := goose.UpTo(db, absPath, targetVersion); err != nil {
-			return fmt.Errorf("ошибка выполнения миграции вперед: %w", err)
+			return fmt.Errorf("error migrating up: %w", err)
 		}
 	} else if targetVersion < currentVersion {
-		// Откат назад
+		// Migrate down
 		if err := goose.DownTo(db, absPath, targetVersion); err != nil {
-			return fmt.Errorf("ошибка отката миграции: %w", err)
+			return fmt.Errorf("error migrating down: %w", err)
 		}
 	}
 

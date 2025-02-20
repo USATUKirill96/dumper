@@ -32,28 +32,27 @@ func debugCmd(cmd *exec.Cmd, debug bool) error {
 	return cmd.Run()
 }
 
-// DumpDatabase делает дамп базы данных
+// DumpDatabase creates a database dump
 func DumpDatabase(dsn string, dumpFile string, debug bool) error {
-	// Сначала проверим, есть ли таблицы в исходной базе
+	// First check if there are tables in source database
 	checkCmd := exec.Command("bash", "-c",
 		fmt.Sprintf("psql '%s' -t -c \"SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public';\"",
 			dsn))
 	output, err := checkCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("ошибка проверки таблиц в исходной базе: %w\nВывод: %s", err, string(output))
+		return fmt.Errorf("error checking tables in source database: %w\nOutput: %s", err, string(output))
 	}
-	debugPrintf(debug, "Количество таблиц в исходной базе: %s", string(output))
 
-	// Делаем дамп с дополнительными опциями
+	// Create dump with additional options
 	cmdString := fmt.Sprintf(
 		"pg_dump "+
-			"--format=plain "+ // Текстовый формат
-			"--no-owner "+ // Без владельцев
-			"--no-privileges "+ // Без привилегий
-			"--clean "+ // Очистка перед восстановлением
-			"--if-exists "+ // Добавляем IF EXISTS в DROP
-			"--schema=public "+ // Только схема public
-			"--disable-triggers "+ // Отключаем триггеры при восстановлении
+			"--format=plain "+ // Plain text format
+			"--no-owner "+ // No owners
+			"--no-privileges "+ // No privileges
+			"--clean "+ // Clean before restore
+			"--if-exists "+ // Add IF EXISTS to DROP
+			"--schema=public "+ // Only public schema
+			"--disable-triggers "+ // Disable triggers during restore
 			"'%s' > %s",
 		dsn, dumpFile)
 
@@ -63,9 +62,8 @@ func DumpDatabase(dsn string, dumpFile string, debug bool) error {
 		cmd.Stderr = os.Stderr
 	}
 
-	debugPrintf(debug, "Выполняю команду дампа...\n")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("ошибка при создании дампа: %w", err)
+		return fmt.Errorf("error creating dump: %w", err)
 	}
 
 	return nil

@@ -1,36 +1,36 @@
 # Dumper
 
-Утилита для создания и загрузки дампов PostgreSQL баз данных.
+A utility for creating and loading PostgreSQL database dumps.
 
-## Возможности
+## Features
 
-- Создание дампов баз данных из разных окружений
-- Автоматическое управление локальным PostgreSQL в Docker
-- Загрузка дампов в локальную базу данных
-- Поддержка нескольких окружений
-- Режим отладки для детальной информации
+- Create database dumps from different environments
+- Automatic management of local PostgreSQL in Docker
+- Load dumps into local database
+- Support for multiple environments
+- Debug mode for detailed information
 
-## Установка
+## Installation
 
-1. Клонируйте репозиторий:
+1. Clone the repository:
 ```bash
 git clone https://github.com/your-username/dumper.git
 cd dumper
 ```
 
-2. Установите зависимости:
+2. Install dependencies:
 ```bash
 go mod download
 ```
 
-3. Скопируйте пример конфигурации и отредактируйте его:
+3. Copy example configuration and edit it:
 ```bash
 cp config.example.yaml config.yaml
 ```
 
-## Конфигурация
+## Configuration
 
-Отредактируйте `config.yaml` и укажите параметры подключения к вашим базам данных:
+Edit `config.yaml` and specify your database connection parameters:
 
 ```yaml
 environments:
@@ -41,21 +41,21 @@ environments:
     db_dsn: postgres://user:password@stage-host:5432/database?sslmode=verify-full
 ```
 
-## Использование
+## Usage
 
-1. Запустите утилиту:
+1. Run the utility:
 ```bash
 go run . [--debug]
 ```
 
-2. Выберите окружение из списка
-3. Используйте доступные команды:
-   - Создание дампа
-   - Загрузка дампа в локальную базу
-   - Смена окружения
+2. Select environment from the list
+3. Use available commands:
+   - Create dump
+   - Load dump into local database
+   - Change environment
 
-## Требования
+## Requirements
 
-- Go 1.21 или выше
+- Go 1.21 or higher
 - Docker
-- PostgreSQL клиент (для создания дампов) 
+- PostgreSQL client (for creating dumps) 
