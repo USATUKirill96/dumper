@@ -5,6 +5,7 @@ import (
 
 	"github.com/jroimartin/gocui"
 
+	"dumper/config/db"
 	"dumper/config/env"
 	"dumper/migrations"
 	"dumper/ui/theme"
@@ -25,14 +26,16 @@ type MigrationsView struct {
 	migrations []migrations.MigrationStatus
 	needUpdate bool
 	onLog      func(string, ...interface{}) // logging function
+	localDb    *db.Connection
 }
 
 // NewMigrationsView creates a new migrations view component
-func NewMigrationsView(g *gocui.Gui, onLog func(string, ...interface{})) *MigrationsView {
+func NewMigrationsView(g *gocui.Gui, localDb *db.Connection, onLog func(string, ...interface{})) *MigrationsView {
 	return &MigrationsView{
 		gui:        g,
 		needUpdate: true,
 		onLog:      onLog,
+		localDb:    localDb,
 	}
 }
 
@@ -122,7 +125,7 @@ func (m *MigrationsView) updateMigrationsList(v *gocui.View) {
 	}
 
 	var err error
-	m.migrations, err = migrations.GetMigrationStatus(m.currentEnv.DbDsn, m.currentEnv.MigrationsDir, m.onLog)
+	m.migrations, err = migrations.GetMigrationStatus(m.localDb.GetDSN(), m.currentEnv.MigrationsDir, m.onLog)
 	if err != nil {
 		fmt.Fprintf(v, " Error getting migrations status: %v\n", err)
 		return
@@ -359,7 +362,7 @@ func (m *MigrationsView) confirmMigration(targetVersion int64) error {
 		return fmt.Errorf("migrations directory not specified")
 	}
 
-	if err := migrations.MigrateTo(m.currentEnv.DbDsn, m.currentEnv.MigrationsDir, targetVersion, m.onLog); err != nil {
+	if err := migrations.MigrateTo(m.localDb.GetDSN(), m.currentEnv.MigrationsDir, targetVersion, m.onLog); err != nil {
 		m.onLog("Migration error: %v", err)
 		return fmt.Errorf("migration error: %w", err)
 	}

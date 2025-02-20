@@ -47,7 +47,7 @@ func New(cfg *app.Config, localDb *db.Connection, onDump, onLoad func() error) (
 	ui.mainLayout = layout.NewMainLayout(gui)
 	ui.logsView = components.NewLogsView(gui)
 	ui.connectionView = components.NewConnectionView(gui, localDb)
-	ui.migrationsView = components.NewMigrationsView(gui, ui.logsView.AddLog)
+	ui.migrationsView = components.NewMigrationsView(gui, localDb, ui.logsView.AddLog)
 	ui.environmentsView = components.NewEnvironmentsView(gui, cfg, ui.onEnvironmentSelected)
 
 	// Add components to layout
