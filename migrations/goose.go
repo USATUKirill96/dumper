@@ -18,11 +18,31 @@ type MigrationStatus struct {
 	Timestamp int64
 }
 
+// Logger для перехвата вывода goose
+type Logger struct {
+	onLog func(string, ...interface{})
+}
+
+func (l *Logger) Fatalf(format string, v ...interface{}) {
+	if l.onLog != nil {
+		l.onLog(format, v...)
+	}
+}
+
+func (l *Logger) Printf(format string, v ...interface{}) {
+	if l.onLog != nil {
+		l.onLog(format, v...)
+	}
+}
+
 // GetMigrationStatus возвращает статус всех миграций
-func GetMigrationStatus(dbDsn string, migrationsDir string) ([]MigrationStatus, error) {
+func GetMigrationStatus(dbDsn string, migrationsDir string, onLog func(string, ...interface{})) ([]MigrationStatus, error) {
 	if migrationsDir == "" {
 		return nil, nil
 	}
+
+	// Настраиваем логгер
+	goose.SetLogger(&Logger{onLog: onLog})
 
 	// Проверяем существование директории
 	absPath, err := filepath.Abs(migrationsDir)
@@ -66,4 +86,44 @@ func GetMigrationStatus(dbDsn string, migrationsDir string) ([]MigrationStatus, 
 	})
 
 	return result, nil
+}
+
+// MigrateTo выполняет миграцию базы данных до указанной версии
+func MigrateTo(dbDsn string, migrationsDir string, targetVersion int64, onLog func(string, ...interface{})) error {
+	// Настраиваем логгер
+	goose.SetLogger(&Logger{onLog: onLog})
+
+	// Проверяем существование директории
+	absPath, err := filepath.Abs(migrationsDir)
+	if err != nil {
+		return fmt.Errorf("ошибка получения абсолютного пути: %w", err)
+	}
+
+	// Подключаемся к базе
+	db, err := sql.Open("postgres", dbDsn)
+	if err != nil {
+		return fmt.Errorf("ошибка подключения к базе: %w", err)
+	}
+	defer db.Close()
+
+	// Получаем текущую версию
+	currentVersion, err := goose.GetDBVersion(db)
+	if err != nil {
+		return fmt.Errorf("ошибка получения текущей версии: %w", err)
+	}
+
+	// Выбираем направление миграции
+	if targetVersion > currentVersion {
+		// Миграция вперед
+		if err := goose.UpTo(db, absPath, targetVersion); err != nil {
+			return fmt.Errorf("ошибка выполнения миграции вперед: %w", err)
+		}
+	} else if targetVersion < currentVersion {
+		// Откат назад
+		if err := goose.DownTo(db, absPath, targetVersion); err != nil {
+			return fmt.Errorf("ошибка отката миграции: %w", err)
+		}
+	}
+
+	return nil
 }

@@ -47,7 +47,7 @@ func New(cfg *config.Config, localDb *config.DbConnection, onDump, onLoad func()
 	// Инициализируем компоненты
 	ui.logsView = NewLogsView(gui)
 	ui.connectionView = NewConnectionView(gui, localDb)
-	ui.migrationsView = NewMigrationsView(gui)
+	ui.migrationsView = NewMigrationsView(gui, ui.logsView.AddLog)
 	ui.environmentsView = NewEnvironmentsView(gui, cfg, ui.onEnvironmentSelected)
 
 	// Выбираем первое окружение по умолчанию
@@ -111,7 +111,7 @@ func (ui *UI) Layout(g *gocui.Gui) error {
 	// Обновляем команды
 	if v, err := g.View(commandsView); err == nil {
 		v.Clear()
-		fmt.Fprintf(v, " d - сохранить копию базы | l - восстановить из копии | пробел - выбор окружения | q - выход")
+		fmt.Fprintf(v, " d - сохранить копию базы | l - восстановить из копии | пробел - выбор окружения | enter - выбор миграции | q - выход")
 	}
 
 	// Отрисовываем список окружений поверх всего, если он открыт
