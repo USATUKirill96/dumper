@@ -2,4 +2,9 @@ module dumper
 
 go 1.23.5
 
-require gopkg.in/yaml.v2 v2.4.0 // indirect
+require (
+	github.com/jroimartin/gocui v0.5.0 // indirect
+	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/nsf/termbox-go v1.1.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
+)

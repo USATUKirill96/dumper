@@ -63,7 +63,7 @@ func DumpDatabase(dsn string, dumpFile string, debug bool) error {
 		cmd.Stderr = os.Stderr
 	}
 
-	fmt.Println("Делаю дамп базы данных...")
+	debugPrintf(debug, "Выполняю команду дампа...\n")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("ошибка при создании дампа: %w", err)
 	}
@@ -78,7 +78,7 @@ func LoadDump(cfg PostgresConfig, dbName string, dumpFile string) error {
 	output, err := checkCmd.Output()
 	if err != nil || len(output) == 0 {
 		// Контейнер не запущен, стартуем его
-		fmt.Println("Контейнер не запущен, запускаю...")
+		debugPrintf(cfg.Debug, "Контейнер не запущен, запускаю...\n")
 		if err := startContainer(cfg, dbName); err != nil {
 			return fmt.Errorf("не удалось запустить контейнер: %w", err)
 		}
@@ -94,7 +94,7 @@ func LoadDump(cfg PostgresConfig, dbName string, dumpFile string) error {
 		return fmt.Errorf("файл дампа не найден: %s", dumpFile)
 	}
 
-	fmt.Printf("Загружаю дамп в базу %s...\n", dbName)
+	debugPrintf(cfg.Debug, "Загружаю дамп в базу %s...\n", dbName)
 
 	// Выводим размер дампа только в режиме debug
 	if cfg.Debug {
@@ -164,17 +164,17 @@ func startContainer(cfg PostgresConfig, dbName string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	fmt.Printf("Запускаю контейнер %s...\n", cfg.ContainerName)
+	debugPrintf(cfg.Debug, "Запускаю контейнер %s...\n", cfg.ContainerName)
 	return cmd.Run()
 }
 
 // waitForPostgres ждёт, пока PostgreSQL внутри контейнера станет доступен
 func waitForPostgres(cfg PostgresConfig) error {
-	fmt.Println("Ожидаю, пока PostgreSQL примет соединения (pg_isready)...")
+	debugPrintf(cfg.Debug, "Ожидаю, пока PostgreSQL примет соединения (pg_isready)...\n")
 	for i := 0; i < cfg.MaxWaitSeconds; i++ {
 		checkCmd := exec.Command("docker", "exec", cfg.ContainerName, "pg_isready", "-U", "postgres")
 		if err := checkCmd.Run(); err == nil {
-			fmt.Println("PostgreSQL готов!")
+			debugPrintf(cfg.Debug, "PostgreSQL готов!\n")
 			return nil
 		}
 		time.Sleep(time.Second)

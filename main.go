@@ -9,6 +9,8 @@ import (
 	"dumper/config"
 	"dumper/database"
 	"dumper/ui"
+
+	"github.com/jroimartin/gocui"
 )
 
 const (
@@ -27,6 +29,14 @@ const (
 	// Директория для дампов
 	dumpsDir = "dumps"
 )
+
+type app struct {
+	ui       *ui.UI
+	cfg      *config.Config
+	localDb  *config.DbConnection
+	pgConfig database.PostgresConfig
+	debug    bool
+}
 
 func main() {
 	// Парсим флаги
@@ -49,50 +59,54 @@ func main() {
 		Debug:          *debug,
 	}
 
-	// Выбираем начальное окружение
-	env, err := ui.SelectEnvironment(cfg)
-	if err != nil {
-		fmt.Printf("Ошибка выбора окружения: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Создаем локальное подключение
+	// Создаем локальное подключение с временной базой
 	localDb := &config.DbConnection{
 		Host:     "localhost",
 		Port:     "5432",
 		User:     "postgres",
 		Password: postgresPassword,
-		Database: env.Name,
+		Database: "postgres", // Будет изменено при выборе окружения
 		SslMode:  "disable",
 	}
 
-	for {
-		choice := ui.ShowMenu(env, localDb)
-		switch choice {
-		case "1":
-			dumpFile := filepath.Join(dumpsDir, fmt.Sprintf("%s.sql", env.Name))
-			if err := database.DumpDatabase(env.DbDsn, dumpFile, *debug); err != nil {
-				fmt.Printf("Ошибка при дампе: %v\n", err)
-			} else {
-				fmt.Printf("Дамп успешно создан в файле %s\n", dumpFile)
-			}
-		case "2":
-			dumpFile := filepath.Join(dumpsDir, fmt.Sprintf("%s.sql", env.Name))
-			if err := database.LoadDump(pgConfig, env.Name, dumpFile); err != nil {
-				fmt.Printf("Ошибка при загрузке дампа: %v\n", err)
-			} else {
-				fmt.Println("Данные успешно загружены в локальную базу!")
-			}
-		case "3":
-			if env, err = ui.SelectEnvironment(cfg); err != nil {
-				fmt.Printf("Ошибка выбора окружения: %v\n", err)
-			}
-			localDb.Database = env.Name
-		case "4":
-			fmt.Println("До свидания!")
-			return
-		default:
-			fmt.Println("Неизвестная команда")
-		}
+	app := &app{
+		cfg:      cfg,
+		localDb:  localDb,
+		pgConfig: pgConfig,
+		debug:    *debug,
 	}
+
+	// Создаем UI
+	ui, err := ui.New(cfg, localDb,
+		// Функция для создания дампа
+		app.dump,
+		// Функция для загрузки дампа
+		app.load,
+	)
+	if err != nil {
+		fmt.Printf("Ошибка создания UI: %v\n", err)
+		os.Exit(1)
+	}
+
+	app.ui = ui
+
+	// Запускаем UI
+	if err := ui.Run(); err != nil && err != gocui.ErrQuit {
+		fmt.Printf("Ошибка в UI: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func (a *app) dump() error {
+	dumpFile := filepath.Join(dumpsDir, fmt.Sprintf("%s.sql", a.localDb.Database))
+	currentEnv := a.ui.GetCurrentEnvironment()
+	if currentEnv == nil {
+		return fmt.Errorf("не выбрано окружение")
+	}
+	return database.DumpDatabase(currentEnv.DbDsn, dumpFile, a.debug)
+}
+
+func (a *app) load() error {
+	dumpFile := filepath.Join(dumpsDir, fmt.Sprintf("%s.sql", a.localDb.Database))
+	return database.LoadDump(a.pgConfig, a.localDb.Database, dumpFile)
 }
