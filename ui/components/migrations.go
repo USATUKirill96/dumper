@@ -21,12 +21,13 @@ const (
 
 // MigrationsView represents the migrations list and management UI component
 type MigrationsView struct {
-	gui        *gocui.Gui
-	currentEnv *env.Environment
-	migrations []migrations.MigrationStatus
-	needUpdate bool
-	onLog      func(string, ...interface{}) // logging function
-	localDb    *db.Connection
+	gui         *gocui.Gui
+	currentEnv  *env.Environment
+	migrations  []migrations.MigrationStatus
+	needUpdate  bool
+	onLog       func(string, ...interface{}) // logging function
+	localDb     *db.Connection
+	isMigrating bool
 }
 
 // NewMigrationsView creates a new migrations view component
@@ -116,24 +117,29 @@ func (m *MigrationsView) isEnvironmentListVisible() bool {
 	return err == nil
 }
 
-func (m *MigrationsView) updateMigrationsList(v *gocui.View) {
+func (m *MigrationsView) updateMigrationsList(v *gocui.View) error {
 	v.Clear()
 
 	if m.currentEnv == nil || m.currentEnv.MigrationsDir == "" {
 		fmt.Fprintln(v, " Migrations directory not specified")
-		return
+		return nil
+	}
+
+	if m.isMigrating {
+		fmt.Fprintln(v, " Migration in progress...")
+		return nil
 	}
 
 	var err error
 	m.migrations, err = migrations.GetMigrationStatus(m.localDb.GetDSN(), m.currentEnv.MigrationsDir, m.onLog)
 	if err != nil {
 		fmt.Fprintf(v, " Error getting migrations status: %v\n", err)
-		return
+		return err
 	}
 
 	if len(m.migrations) == 0 {
 		fmt.Fprintln(v, " No migrations found")
-		return
+		return nil
 	}
 
 	var applied int
@@ -153,13 +159,25 @@ func (m *MigrationsView) updateMigrationsList(v *gocui.View) {
 		fmt.Fprintf(v, " [%s] %s\n", status, m.ShortName)
 	}
 
-	v.SetOrigin(0, 0)
-	v.SetCursor(0, 1)
+	if err := v.SetOrigin(0, 0); err != nil {
+		m.onLog("Error setting origin: %v", err)
+		return err
+	}
+
+	if err := v.SetCursor(0, 1); err != nil {
+		m.onLog("Error setting cursor: %v", err)
+		return err
+	}
 
 	// Ensure migrations view is active
 	if !m.isEnvironmentListVisible() {
-		m.gui.SetCurrentView(migrationsView)
+		if _, err := m.gui.SetCurrentView(migrationsView); err != nil {
+			m.onLog("Error setting current view: %v", err)
+			return err
+		}
 	}
+
+	return nil
 }
 
 // Navigation methods
@@ -172,11 +190,20 @@ func (m *MigrationsView) up(g *gocui.Gui, v *gocui.View) error {
 	_, cy := v.Cursor()
 
 	if cy > 1 {
-		if err := v.SetCursor(0, cy-1); err != nil && oy > 0 {
-			if err := v.SetOrigin(ox, oy-1); err != nil {
+		if err := v.SetCursor(0, cy-1); err != nil {
+			if oy > 0 {
+				if err := v.SetOrigin(ox, oy-1); err != nil {
+					m.onLog("Error setting origin: %v", err)
+					return err
+				}
+				if err := v.SetCursor(0, cy-1); err != nil {
+					m.onLog("Error setting cursor: %v", err)
+					return err
+				}
+			} else {
+				m.onLog("Error setting cursor: %v", err)
 				return err
 			}
-			return v.SetCursor(0, cy-1)
 		}
 	}
 	return nil
@@ -193,11 +220,20 @@ func (m *MigrationsView) down(g *gocui.Gui, v *gocui.View) error {
 	maxY := len(m.migrations) + 1 // +1 for header
 
 	if cy < maxY-1 {
-		if err := v.SetCursor(0, cy+1); err != nil && oy < maxY-height {
-			if err := v.SetOrigin(ox, oy+1); err != nil {
+		if err := v.SetCursor(0, cy+1); err != nil {
+			if oy < maxY-height {
+				if err := v.SetOrigin(ox, oy+1); err != nil {
+					m.onLog("Error setting origin: %v", err)
+					return err
+				}
+				if err := v.SetCursor(0, cy+1); err != nil {
+					m.onLog("Error setting cursor: %v", err)
+					return err
+				}
+			} else {
+				m.onLog("Error setting cursor: %v", err)
 				return err
 			}
-			return v.SetCursor(0, cy+1)
 		}
 	}
 	return nil
@@ -209,9 +245,14 @@ func (m *MigrationsView) start(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	if err := v.SetOrigin(0, 0); err != nil {
+		m.onLog("Error setting origin: %v", err)
 		return err
 	}
-	return v.SetCursor(0, 1)
+	if err := v.SetCursor(0, 1); err != nil {
+		m.onLog("Error setting cursor: %v", err)
+		return err
+	}
+	return nil
 }
 
 func (m *MigrationsView) end(g *gocui.Gui, v *gocui.View) error {
@@ -228,6 +269,7 @@ func (m *MigrationsView) end(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	if err := v.SetOrigin(0, originY); err != nil {
+		m.onLog("Error setting origin: %v", err)
 		return err
 	}
 
@@ -235,7 +277,11 @@ func (m *MigrationsView) end(g *gocui.Gui, v *gocui.View) error {
 	if lastVisibleLine >= height {
 		lastVisibleLine = height - 1
 	}
-	return v.SetCursor(0, lastVisibleLine)
+	if err := v.SetCursor(0, lastVisibleLine); err != nil {
+		m.onLog("Error setting cursor: %v", err)
+		return err
+	}
+	return nil
 }
 
 // Dialog methods
@@ -247,6 +293,11 @@ func (m *MigrationsView) showConfirmDialog(g *gocui.Gui, v *gocui.View) error {
 	_, cy := v.Cursor()
 	if cy == 0 { // Header
 		return nil
+	}
+
+	if cy-1 >= len(m.migrations) {
+		m.onLog("Error: invalid cursor position")
+		return fmt.Errorf("invalid cursor position")
 	}
 
 	selectedMigration := m.migrations[cy-1]
@@ -338,7 +389,10 @@ func (m *MigrationsView) showConfirmDialog(g *gocui.Gui, v *gocui.View) error {
 			return err
 		}
 
-		g.SetCurrentView(confirmDialogView)
+		if _, err := g.SetCurrentView(confirmDialogView); err != nil {
+			m.onLog("Error setting current view: %v", err)
+			return err
+		}
 	}
 
 	return nil
@@ -362,27 +416,65 @@ func (m *MigrationsView) confirmMigration(targetVersion int64) error {
 		return fmt.Errorf("migrations directory not specified")
 	}
 
-	if err := migrations.MigrateTo(m.localDb.GetDSN(), m.currentEnv.MigrationsDir, targetVersion, m.onLog); err != nil {
-		m.onLog("Migration error: %v", err)
-		return fmt.Errorf("migration error: %w", err)
+	if m.localDb == nil {
+		m.onLog("Error: local database not initialized")
+		return fmt.Errorf("local database not initialized")
 	}
 
-	m.onLog("Migration completed successfully!")
-	m.needUpdate = true // Update list after migration
-
-	// Force UI update
+	// Устанавливаем флаг миграции и обновляем UI
+	m.isMigrating = true
+	m.needUpdate = true
 	m.gui.Update(func(g *gocui.Gui) error {
+		if v, err := g.View(migrationsView); err == nil {
+			return m.updateMigrationsList(v)
+		}
 		return nil
 	})
+
+	// Запускаем миграцию в отдельной горутине
+	go func() {
+		if err := migrations.MigrateTo(m.localDb.GetDSN(), m.currentEnv.MigrationsDir, targetVersion, m.onLog); err != nil {
+			m.onLog("Migration error: %v", err)
+		} else {
+			m.onLog("Migration completed successfully!")
+		}
+
+		// Сбрасываем флаг миграции и обновляем UI
+		m.isMigrating = false
+		m.needUpdate = true
+		m.gui.Update(func(g *gocui.Gui) error {
+			if v, err := g.View(migrationsView); err == nil {
+				return m.updateMigrationsList(v)
+			}
+			return nil
+		})
+	}()
+
 	return nil
 }
 
 func (m *MigrationsView) closeConfirmDialog(g *gocui.Gui, v *gocui.View) error {
+	// Delete keybindings first
 	g.DeleteKeybinding("", 'y', gocui.ModNone)
 	g.DeleteKeybinding("", 'n', gocui.ModNone)
-	g.DeleteView(confirmButtonView)
-	g.DeleteView(cancelButtonView)
-	g.DeleteView(confirmDialogView)
-	g.SetCurrentView(migrationsView)
+
+	// Delete views if they exist
+	if v := g.CurrentView(); v != nil && v.Name() == confirmDialogView {
+		if _, err := g.SetCurrentView(migrationsView); err != nil {
+			m.onLog("Error setting current view: %v", err)
+			return err
+		}
+	}
+
+	views := []string{confirmButtonView, cancelButtonView, confirmDialogView}
+	for _, name := range views {
+		if v, err := g.View(name); err == nil && v != nil {
+			if err := g.DeleteView(name); err != nil {
+				m.onLog("Error deleting view %s: %v", name, err)
+				return err
+			}
+		}
+	}
+
 	return nil
 }
